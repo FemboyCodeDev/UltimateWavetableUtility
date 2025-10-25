@@ -22,7 +22,7 @@ public class AudioPlayer {
         // AudioFormat(float sampleRate, int sampleSizeInBits, int channels, boolean signed, boolean bigEndian)
         this.format = new AudioFormat(
                 sampleRate,
-                16,
+                8,
                 1, // Mono channel
                 true, // Signed PCM data
                 false // Little-endian byte order
