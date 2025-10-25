@@ -6,6 +6,11 @@ import audio_core.audio_buffer;
 import audio_core.sequencer;
 import javax.sound.sampled.LineUnavailableException;
 
+
+//TODO: User interface
+//TODO: Documentation
+//TODO: Orginisation
+//TODO: Saving and loading
 void main() throws LineUnavailableException {
     int SAMPLE_RATE = 44100;
     wave_script play_back = new sine();
