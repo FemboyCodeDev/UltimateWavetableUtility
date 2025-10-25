@@ -10,6 +10,17 @@ public class Note {
     public boolean active; //Define if note is active or not
     public byte cycle; // TODO: DOCUMENT
 
-
+    public Note(int note, boolean active, byte velocity,byte cycle){
+        this.note = note;
+        this.active = active;
+        this.velocity = velocity;
+        this.cycle = cycle;
+    }
+    public Note(int note){
+        this.note = note;
+        this.active = true;
+        this.velocity = 0;
+        this.cycle = 0;
+    }
 
 }
