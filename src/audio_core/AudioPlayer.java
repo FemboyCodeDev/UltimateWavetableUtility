@@ -1,0 +1,137 @@
+package audio_core;
+import javax.sound.sampled.*;
+import java.io.ByteArrayInputStream;
+
+/**
+ * AudioPlayer class provides a utility to play raw byte arrays representing
+ * audio data through the computer's sound buffer (SourceDataLine).
+ *
+ * It defaults to a common audio format: 44100 Hz, 16-bit, Mono, Signed, Little-Endian.
+ */
+public class AudioPlayer {
+
+    private final AudioFormat format;
+    private SourceDataLine line;
+
+    /**
+     * Constructs an AudioPlayer with the specified sample rate, using 16-bit,
+     * mono, signed, little-endian format.
+     * @param sampleRate The desired sample rate (e.g., 44100.0F).
+     */
+    public AudioPlayer(float sampleRate) {
+        // AudioFormat(float sampleRate, int sampleSizeInBits, int channels, boolean signed, boolean bigEndian)
+        this.format = new AudioFormat(
+                sampleRate,
+                16,
+                1, // Mono channel
+                true, // Signed PCM data
+                false // Little-endian byte order
+        );
+        System.out.println("Initialized Audio Format: " + format);
+    }
+
+    /**
+     * Initializes and opens the SourceDataLine required for playback.
+     * @throws LineUnavailableException If a suitable SourceDataLine is not available.
+     */
+    public void openLine() throws LineUnavailableException {
+        // Define the desired data line info
+        DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
+
+        // Check if the system supports the specified format
+        if (!AudioSystem.isLineSupported(info)) {
+            throw new LineUnavailableException("The specified audio format is not supported by the system.");
+        }
+
+        // Get and open the SourceDataLine
+        this.line = (SourceDataLine) AudioSystem.getLine(info);
+        this.line.open(format);
+        this.line.start(); // Start the line, preparing it to accept data
+        System.out.println("SourceDataLine opened and started successfully.");
+    }
+
+    /**
+     * Writes the raw audio data (byte array) to the sound buffer for playback.
+     *
+     * @param audioData The byte array containing the 16-bit PCM audio data.
+     */
+    public void playBytes(byte[] audioData) {
+        if (line == null) {
+            System.err.println("Error: Audio line is null. Cannot play data.");
+            return;
+        }
+
+        // Explicitly start the line if it is not running.
+        // This makes the playback more robust against unexpected line state changes.
+        if (!line.isRunning()) {
+            line.start();
+        }
+
+        // The write method handles sending the buffer data to the audio device
+        // We write the entire array starting from index 0
+        int bytesWritten = line.write(audioData, 0, audioData.length);
+        System.out.println(bytesWritten + " bytes written to the audio buffer.");
+    }
+
+    /**
+     * Drains the line (waits for all queued data to play), stops the line,
+     * and releases system resources.
+     */
+    public void closeLine() {
+        if (line != null) {
+            System.out.println("Waiting for playback to finish...");
+            line.drain(); // Wait until all data in the buffer is played
+            line.stop();
+            line.close();
+            System.out.println("SourceDataLine closed.");
+        }
+    }
+
+    /**
+     * Main method for demonstrating the AudioPlayer by generating and playing
+     * a 2-second, 440 Hz sine wave tone.
+     */
+    public static void main(String[] args) {
+        final int SAMPLE_RATE = 44100;
+        final int HERTZ = 440; // The note A4
+        final int DURATION_SECONDS = 2;
+
+        System.out.println("--- Starting Audio Playback Demo ---");
+        AudioPlayer player = new AudioPlayer(SAMPLE_RATE);
+
+        try {
+            // 1. Open the audio line
+            player.openLine();
+
+            // 2. Generate raw 16-bit PCM audio data (sine wave)
+            final int bytesPerSample = 2; // 16-bit = 2 bytes
+            final int numSamples = SAMPLE_RATE * DURATION_SECONDS;
+            final int bufferSize = numSamples * bytesPerSample;
+            byte[] audioData = new byte[bufferSize];
+
+            for (int i = 0; i < numSamples; i++) {
+                // Calculate the phase angle
+                double angle = 2.0 * Math.PI * HERTZ * i / SAMPLE_RATE;
+
+                // Calculate sample value (short is 16-bit, max value 32767)
+                short value = (short) (Math.sin(angle) * 32767);
+
+                // Convert short (16-bit) to two bytes (Little-Endian)
+                // Little-endian means the low byte goes first (at i*2)
+                audioData[i * 2] = (byte) (value & 0xFF);          // Low byte
+                audioData[i * 2 + 1] = (byte) ((value >> 8) & 0xFF); // High byte
+            }
+            System.out.println("Generated " + audioData.length + " bytes of 440Hz tone data.");
+
+            // 3. Play the generated bytes
+            player.playBytes(audioData);
+
+        } catch (LineUnavailableException e) {
+            System.err.println("Error: Could not open the audio line: " + e.getMessage());
+        } finally {
+            // 4. Clean up resources
+            player.closeLine();
+            System.out.println("--- Demo Finished ---");
+        }
+    }
+}
