@@ -22,5 +22,11 @@ public class Note {
         this.velocity = 0;
         this.cycle = 0;
     }
+    public Note(int note,byte velocity){
+        this.note = note;
+        this.active = true;
+        this.velocity = velocity;
+        this.cycle = 0;
+    }
 
 }
