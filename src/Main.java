@@ -16,7 +16,10 @@ void main() throws LineUnavailableException {
     sequencer seq = new sequencer(play_back);
 
     seq.sequence[2][1] = 69;
+    seq.sequence_active[2][1] = true;
     seq.sequence[3][1] = 69;
+    seq.sequence_active[3][1] = true;
+    seq.sequence_active[3][2] = true;
     seq.sequence[3][2] = 69+12;
 
     TimerTask task = new TimerTask(){
