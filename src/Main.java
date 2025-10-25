@@ -3,17 +3,21 @@ import audio_core.wave_script;
 import audio_core.Note;
 import audio_core.presets.sine;
 import audio_core.audio_buffer;
-
+import audio_core.sequencer;
 import javax.sound.sampled.LineUnavailableException;
 
 void main() throws LineUnavailableException {
     int SAMPLE_RATE = 44100;
     wave_script play_back = new sine();
 
-    play_back.note_start(new Note(69));
+    //play_back.note_start(new Note(69));
     audio_buffer a_buf = new audio_buffer(SAMPLE_RATE);
 
+    sequencer seq = new sequencer(play_back);
 
+    seq.sequence[2][1] = 69;
+    seq.sequence[3][1] = 69;
+    seq.sequence[3][2] = 69+12;
 
     TimerTask task = new TimerTask(){
         public void play(){
@@ -26,6 +30,7 @@ void main() throws LineUnavailableException {
         public void run(){
             for (int i =0; i<16;i++){
                 play();
+                seq.call_note_sequence(i);
             }
         }
     };
