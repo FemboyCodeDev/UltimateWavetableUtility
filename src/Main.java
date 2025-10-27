@@ -38,7 +38,7 @@ void main() throws LineUnavailableException {
 
 
 
-    ui.console.setSpaceTaskFactory(() -> new TimerTask(){
+    ui.console.setSpaceTaskFactory(() -> new Runnable(){
         boolean playing = true;
         public void play(){
         byte[] data = play_back.generate(SAMPLE_RATE);
@@ -50,14 +50,17 @@ void main() throws LineUnavailableException {
         }
 
         public void run(){
+
             for (int i =0; i<16;i++){
-                System.out.println(i);
+                System.out.println(!Thread.currentThread().isInterrupted());
+                playing = !Thread.currentThread().isInterrupted();
                 if (playing==false){
                     return;
                 }
                 play();
                 seq.call_note_sequence(i);
             }
+
         }
     });
 
