@@ -19,6 +19,9 @@ public class TextWindowConsole extends JFrame {
     // A flag to simulate non-blocking input handling (like a game loop)
     private final AtomicBoolean running = new AtomicBoolean(true);
 
+    // New flag to control window update suppression (primarily auto-scrolling and direct append)
+    private volatile boolean update_lock = false;
+
     // 🆕 New members for non-blocking task handling using a dedicated Thread
     private Thread current_space_thread;
     // Supplier for the core logic (the Runnable)
@@ -136,6 +139,31 @@ public class TextWindowConsole extends JFrame {
         this.space_task_factory = factory;
     }
 
+    // --- 🆕 New Methods for Update Suppression ---
+
+    /**
+     * Sets the update lock. While locked, new output text is appended but auto-scrolling is suppressed.
+     * Use this before a batch of prints for performance.
+     */
+    public void lockUpdates() {
+        this.update_lock = true;
+    }
+
+    /**
+     * Releases the update lock. This triggers a final auto-scroll to the bottom.
+     * Call this after a batch of prints is complete.
+     */
+    public void unlockUpdates() {
+        this.update_lock = false;
+        // Force a scroll to the bottom immediately after unlocking
+        SwingUtilities.invokeLater(() -> {
+            outputArea.setCaretPosition(outputArea.getDocument().getLength());
+        });
+    }
+
+    // ---------------------------------------------
+
+
     /**
      * Appends text to the console window without a trailing newline.
      * This method is thread-safe, ensuring GUI updates happen on the Event Dispatch Thread (EDT).
@@ -146,8 +174,10 @@ public class TextWindowConsole extends JFrame {
         SwingUtilities.invokeLater(() -> {
             outputArea.append(text);
 
-            // Auto-scroll to the bottom of the output area
-            outputArea.setCaretPosition(outputArea.getDocument().getLength());
+            // Auto-scroll to the bottom of the output area ONLY if not locked
+            if (!update_lock) {
+                outputArea.setCaretPosition(outputArea.getDocument().getLength());
+            }
         });
     }
 
@@ -162,8 +192,10 @@ public class TextWindowConsole extends JFrame {
         SwingUtilities.invokeLater(() -> {
             outputArea.append(text + "\n");
 
-            // Auto-scroll to the bottom of the output area
-            outputArea.setCaretPosition(outputArea.getDocument().getLength());
+            // Auto-scroll to the bottom of the output area ONLY if not locked
+            if (!update_lock) {
+                outputArea.setCaretPosition(outputArea.getDocument().getLength());
+            }
         });
     }
 
@@ -241,6 +273,25 @@ public class TextWindowConsole extends JFrame {
                     }
                 }
                 console.println("Simulation stopped.");
+            }).start();
+
+            // --- 🆕 Demonstration of update suppression ---
+            new Thread(() -> {
+                try {
+                    Thread.sleep(5000); // Wait 5 seconds
+                    console.println("\n[DEMO] Starting a batch of 50 prints with update suppression...");
+                    console.lockUpdates(); // 🔒 Lock updates
+
+                    for (int i = 1; i <= 50; i++) {
+                        console.println(String.format("[BATCH] Locked Print %d.", i));
+                        Thread.sleep(10); // Short delay to simulate work, but scrolling is suppressed
+                    }
+
+                    console.println("[DEMO] Batch complete. Unlocking updates now.");
+                    console.unlockUpdates(); // 🔓 Unlock updates, forces scroll
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }).start();
         });
     }
