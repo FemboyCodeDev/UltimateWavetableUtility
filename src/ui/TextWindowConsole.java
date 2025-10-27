@@ -220,11 +220,20 @@ public class TextWindowConsole extends JFrame {
         println("");
     }
 
+    // Inside TextWindowConsole.java
     public void clear() {
-        // Swing GUI updates must happen on the EDT. SwingUtilities.invokeLater ensures this.
-        SwingUtilities.invokeLater(() -> {
-            outputArea.setText("");
-        });
+        if (update_lock) {
+            // 🆕 If locked, just clear the pending buffer, no GUI update is needed.
+            synchronized (text_buffer) {
+                text_buffer.setLength(0);
+            }
+            // If the buffer is cleared, any subsequent prints will start from a clean slate.
+        } else {
+            // If unlocked, execute the clear on the EDT immediately (with potential for flicker)
+            SwingUtilities.invokeLater(() -> {
+                outputArea.setText("");
+            });
+        }
     }
 
     public boolean isRunning() {

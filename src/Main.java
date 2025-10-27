@@ -111,10 +111,12 @@ void main() throws LineUnavailableException {
 
                     running[0] = ui.console.space_toggle;
                     //ui.console.println(String.format("[LOG] Simulation step %d complete.", ++count));
+                    ui.console.lockUpdates();
                     ui.console.clear();
                     ui.row_playing = progress[0];
                     ui.render_notes(set, row.get());
                     ui.console.println(progress[0]);
+                    ui.console.unlockUpdates();
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
