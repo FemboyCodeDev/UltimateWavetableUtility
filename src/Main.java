@@ -6,6 +6,10 @@ import audio_core.audio_buffer;
 import audio_core.sequencer;
 import javax.sound.sampled.LineUnavailableException;
 
+import ui.TextWindowConsole;
+import ui.text_ui;
+
+
 
 //TODO: User interface
 //TODO: Documentation
@@ -19,6 +23,11 @@ void main() throws LineUnavailableException {
     audio_buffer a_buf = new audio_buffer(SAMPLE_RATE);
 
     sequencer seq = new sequencer(play_back);
+
+
+    //TextWindowConsole console = new TextWindowConsole("Custom Java Console - Arrow Key Input");
+    text_ui text_ui = new text_ui();
+    //text_ui.setup(console);
 
     seq.sequence[2][1] = 69;
     seq.sequence_active[2][1] = true;

@@ -32,4 +32,9 @@ public class text_ui {
         notes[2][2][1] = 16;
         render_notes(2,2);
     }
+
+    public void setup(TextWindowConsole console) {
+        this.console = console;
+
+    }
 }
