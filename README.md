@@ -1,3 +1,3 @@
-# ULTIMATE WAVETABLE UTILITY (UWU)
+# Uwu Music Software
 ## Summary
-Ultimate wavetable utility is an open source music tracker.
+UwU music software is an open source music tracker.
