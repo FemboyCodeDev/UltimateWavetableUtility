@@ -1,12 +1,10 @@
 
 import audio_core.wave_script;
-import audio_core.Note;
 import audio_core.presets.sine;
 import audio_core.audio_buffer;
 import audio_core.sequencer;
 import javax.sound.sampled.LineUnavailableException;
 
-import ui.TextWindowConsole;
 import ui.text_ui;
 
 
@@ -26,7 +24,7 @@ void main() throws LineUnavailableException {
 
 
     //TextWindowConsole console = new TextWindowConsole("Custom Java Console - Arrow Key Input");
-    text_ui text_ui = new text_ui();
+    text_ui ui = new text_ui();
     //text_ui.setup(console);
 
     seq.sequence[2][1] = 69;
@@ -35,6 +33,8 @@ void main() throws LineUnavailableException {
     seq.sequence_active[3][1] = true;
     seq.sequence_active[3][2] = true;
     seq.sequence[3][2] = 69+12;
+
+    ui.notes[0]= seq.sequence;
 
     TimerTask task = new TimerTask(){
         public void play(){
@@ -52,7 +52,9 @@ void main() throws LineUnavailableException {
         }
     };
 
-    task.run();
+    ui.console.space_task = task;
+
+    //task.run();
 
 
 

@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -17,6 +18,10 @@ public class TextWindowConsole extends JFrame {
 
     // A flag to simulate non-blocking input handling (like a game loop)
     private final AtomicBoolean running = new AtomicBoolean(true);
+
+
+    public TimerTask space_task;
+    private boolean space_toggle;
 
     public TextWindowConsole(String title) {
         super(title);
@@ -63,6 +68,17 @@ public class TextWindowConsole extends JFrame {
                         break;
                     case KeyEvent.VK_RIGHT:
                         keyName = "Right Arrow";
+                        break;
+                    case KeyEvent.VK_SPACE:
+                        keyName = "Space";
+
+                        space_toggle = (space_toggle == false);
+                        System.out.println(space_toggle);
+                        if(space_toggle) {
+                            space_task.cancel();
+                        }else {
+                            space_task.run();
+                        }
                         break;
                     case KeyEvent.VK_ESCAPE:
                         // Example of a control key to stop the simulation

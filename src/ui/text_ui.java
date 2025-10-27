@@ -2,7 +2,7 @@ package ui;
 
 public class text_ui {
 
-    static TextWindowConsole console = new TextWindowConsole("Custom Java Console - Arrow Key Input");
+    public static TextWindowConsole console = new TextWindowConsole("Custom Java Console - Arrow Key Input");
 
     private static String padIntToString(int number) {
         // The format specifier "%04d" means:
