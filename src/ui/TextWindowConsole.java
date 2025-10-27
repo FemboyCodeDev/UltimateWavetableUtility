@@ -4,8 +4,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /**
  * A custom console-like window that supports text output and captures arrow key inputs.
@@ -19,9 +21,11 @@ public class TextWindowConsole extends JFrame {
     // A flag to simulate non-blocking input handling (like a game loop)
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-
-    public TimerTask space_task;
-    private boolean space_toggle;
+    // 🆕 New members for non-blocking task handling
+    private final Timer timer;
+    private TimerTask current_space_task; // The currently running task instance
+    private Supplier<TimerTask> space_task_factory; // Function to create a NEW task instance
+    private boolean space_toggle = false; // State: false=stopped, true=running
 
     public TextWindowConsole(String title) {
         super(title);
@@ -46,16 +50,17 @@ public class TextWindowConsole extends JFrame {
         this.setSize(800, 600);
         this.setLocationRelativeTo(null); // Center the window
 
+        // 🆕 Initialize the Timer for non-blocking execution
+        this.timer = new Timer(true); // true makes it a daemon thread
+
         // --- 3. Add Key Input Handling ---
 
-        // We add the KeyListener to the JTextArea since it is the component that
-        // will usually have focus inside the window.
         outputArea.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
                 String keyName = "";
 
-                // Identify the specific arrow key pressed
+                // Identify the specific key pressed
                 switch (e.getKeyCode()) {
                     case KeyEvent.VK_UP:
                         keyName = "Up Arrow";
@@ -72,14 +77,34 @@ public class TextWindowConsole extends JFrame {
                     case KeyEvent.VK_SPACE:
                         keyName = "Space";
 
-                        space_toggle = (space_toggle == false);
-                        System.out.println(space_toggle);
-                        if(space_toggle) {
-                            space_task.cancel();
-                        }else {
-                            space_task.run();
+                        // 🆕 Non-blocking space task logic
+                        if (space_task_factory == null) {
+                            println("[ERROR]: Space task factory not set. Cannot run task.");
+                            return;
                         }
-                        break;
+
+                        // Toggle the state
+                        space_toggle = !space_toggle;
+
+                        if (!space_toggle) { // Task was running, now stop
+                            if (current_space_task != null) {
+                                // Cancels the scheduled execution
+                                current_space_task.cancel();
+                            }
+                            println("[INPUT]: Space pressed. Task STOPPED.");
+                        } else { // Task was stopped, now start
+                            // 1. Create a brand new task instance from the factory
+                            current_space_task = space_task_factory.get();
+
+                            // 2. Schedule the new task instance non-blockingly
+                            // Example: Run every 500 milliseconds, starting immediately
+                            // This runs the task on a separate thread (the Timer thread).
+                            timer.schedule(current_space_task, 0, 500);
+
+                            println("[INPUT]: Space pressed. Task STARTED (500ms interval).");
+                        }
+                        return; // Handled Space key
+
                     case KeyEvent.VK_ESCAPE:
                         // Example of a control key to stop the simulation
                         keyName = "Escape (Exiting Simulation)";
@@ -99,6 +124,15 @@ public class TextWindowConsole extends JFrame {
         // Must be done *after* the frame is made visible
         this.setVisible(true);
         outputArea.requestFocusInWindow();
+    }
+
+    /**
+     * Sets the factory used to create a new TimerTask instance every time the
+     * space key is pressed to start the task.
+     * @param factory A function that returns a new TimerTask.
+     */
+    public void setSpaceTaskFactory(Supplier<TimerTask> factory) {
+        this.space_task_factory = factory;
     }
 
     /**
@@ -161,9 +195,32 @@ public class TextWindowConsole extends JFrame {
             console.println("Press ESC to stop the background simulation.");
             console.println("-------------------------------------");
 
-            // --- Demonstration of background process output ---
+            // 🆕 Set the factory for the space task
+            // This factory provides a *new* TimerTask instance every time it's called
+            console.setSpaceTaskFactory(() -> new TimerTask() {
+                private int counter = 0;
+                @Override
+                public void run() {
+                    // This code runs on the Timer's thread, NOT the EDT.
+                    // This is non-blocking to the GUI!
+                    // Note: console.println() is still safe because it uses SwingUtilities.invokeLater() internally.
+                    console.println("[SPACE TASK] Running non-blockingly! Count: " + ++counter);
 
-            // This simulates a background thread writing log data or game state updates
+                    if (counter >= 10) {
+                        // Example: stop the task after 10 runs
+                        console.println("[SPACE TASK] Auto-stopping after 10 runs.");
+                        this.cancel();
+                        // Note: The 'space_toggle' state in the JFrame won't update here
+                        // unless you add logic to call the key handler to simulate a stop,
+                        // or update the JFrame's state fields directly (more complex).
+                    }
+                }
+            });
+
+            console.println("Press SPACE to start/stop the non-blocking TimerTask (runs every 500ms).");
+            console.println("-------------------------------------");
+
+            // --- Demonstration of background process output (existing simulation log) ---
             new Thread(() -> {
                 int count = 0;
                 while (console.isRunning()) {

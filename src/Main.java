@@ -36,13 +36,15 @@ void main() throws LineUnavailableException {
 
     ui.notes[0]= seq.sequence;
 
-    TimerTask task = new TimerTask(){
+    ui.console.setSpaceTaskFactory(() -> new TimerTask(){
         public void play(){
         byte[] data = play_back.generate(SAMPLE_RATE);
 
 
 
-        a_buf.play_bytes(data);}
+        a_buf.play_bytes(data);
+
+        }
 
         public void run(){
             for (int i =0; i<16;i++){
@@ -50,9 +52,9 @@ void main() throws LineUnavailableException {
                 seq.call_note_sequence(i);
             }
         }
-    };
+    });
 
-    ui.console.space_task = task;
+    //.space_task = task;
 
     //task.run();
 
