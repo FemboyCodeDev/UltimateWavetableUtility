@@ -4,8 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -21,10 +19,10 @@ public class TextWindowConsole extends JFrame {
     // A flag to simulate non-blocking input handling (like a game loop)
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    // 🆕 New members for non-blocking task handling
-    private final Timer timer;
-    private TimerTask current_space_task; // The currently running task instance
-    private Supplier<TimerTask> space_task_factory; // Function to create a NEW task instance
+    // 🆕 New members for non-blocking task handling using a dedicated Thread
+    private Thread current_space_thread;
+    // Supplier for the core logic (the Runnable)
+    private Supplier<Runnable> space_task_factory;
     private boolean space_toggle = false; // State: false=stopped, true=running
 
     public TextWindowConsole(String title) {
@@ -50,8 +48,7 @@ public class TextWindowConsole extends JFrame {
         this.setSize(800, 600);
         this.setLocationRelativeTo(null); // Center the window
 
-        // 🆕 Initialize the Timer for non-blocking execution
-        this.timer = new Timer(true); // true makes it a daemon thread
+        // 🆕 Removed java.util.Timer initialization
 
         // --- 3. Add Key Input Handling ---
 
@@ -77,7 +74,7 @@ public class TextWindowConsole extends JFrame {
                     case KeyEvent.VK_SPACE:
                         keyName = "Space";
 
-                        // 🆕 Non-blocking space task logic
+                        // 🆕 Non-blocking space task logic using Thread
                         if (space_task_factory == null) {
                             println("[ERROR]: Space task factory not set. Cannot run task.");
                             return;
@@ -87,21 +84,22 @@ public class TextWindowConsole extends JFrame {
                         space_toggle = !space_toggle;
 
                         if (!space_toggle) { // Task was running, now stop
-                            if (current_space_task != null) {
-                                // Cancels the scheduled execution
-                                current_space_task.cancel();
+                            if (current_space_thread != null) {
+                                // 1. Crucial: Interrupt the running thread.
+                                // The task's run() method must check for this interrupt.
+                                current_space_thread.interrupt();
+                                current_space_thread = null; // Clean up the reference
                             }
                             println("[INPUT]: Space pressed. Task STOPPED.");
                         } else { // Task was stopped, now start
-                            // 1. Create a brand new task instance from the factory
-                            current_space_task = space_task_factory.get();
+                            // 1. Create a brand new Thread instance with the supplied Runnable
+                            current_space_thread = new Thread(space_task_factory.get(), "SpaceTaskThread");
+                            current_space_thread.setDaemon(true); // Allow JVM to exit if this is the only thread left
 
-                            // 2. Schedule the new task instance non-blockingly
-                            // Example: Run every 500 milliseconds, starting immediately
-                            // This runs the task on a separate thread (the Timer thread).
-                            timer.schedule(current_space_task, 0, 500);
+                            // 2. Start the new task instance non-blockingly
+                            current_space_thread.start();
 
-                            println("[INPUT]: Space pressed. Task STARTED (500ms interval).");
+                            println("[INPUT]: Space pressed. Task STARTED (runs until interrupted).");
                         }
                         return; // Handled Space key
 
@@ -127,11 +125,11 @@ public class TextWindowConsole extends JFrame {
     }
 
     /**
-     * Sets the factory used to create a new TimerTask instance every time the
+     * Sets the factory used to create a new Runnable instance every time the
      * space key is pressed to start the task.
-     * @param factory A function that returns a new TimerTask.
+     * @param factory A function that returns a new Runnable.
      */
-    public void setSpaceTaskFactory(Supplier<TimerTask> factory) {
+    public void setSpaceTaskFactory(Supplier<Runnable> factory) {
         this.space_task_factory = factory;
     }
 
@@ -183,41 +181,37 @@ public class TextWindowConsole extends JFrame {
             TextWindowConsole console = new TextWindowConsole("Custom Java Console - Arrow Key Input");
 
             console.println("--- Welcome to the Custom Console ---");
-            console.println("Type text in your main code, then run the program to see output here.");
-
-            // Demonstration of print() vs println()
-            console.print("This text uses the new ");
-            console.print("print() method, so it ");
-            console.println("stays on one line.");
-            console.println("This line uses println() and starts on a new line.");
-
             console.println("Press the Up, Down, Left, or Right arrow keys to test input capture.");
             console.println("Press ESC to stop the background simulation.");
             console.println("-------------------------------------");
 
-            // 🆕 Set the factory for the space task
-            // This factory provides a *new* TimerTask instance every time it's called
-            console.setSpaceTaskFactory(() -> new TimerTask() {
+            // 🆕 Set the factory for the space task, now providing a Runnable
+            console.setSpaceTaskFactory(() -> new Runnable() {
                 private int counter = 0;
                 @Override
                 public void run() {
-                    // This code runs on the Timer's thread, NOT the EDT.
-                    // This is non-blocking to the GUI!
-                    // Note: console.println() is still safe because it uses SwingUtilities.invokeLater() internally.
-                    console.println("[SPACE TASK] Running non-blockingly! Count: " + ++counter);
+                    // This code runs on the dedicated "SpaceTaskThread".
+                    try {
+                        // The loop should continue *until* the thread is interrupted
+                        while (!Thread.currentThread().isInterrupted()) {
+                            // Non-blocking task logic
+                            console.println("[SPACE TASK] Running non-blockingly! Count: " + ++counter);
 
-                    if (counter >= 10) {
-                        // Example: stop the task after 10 runs
-                        console.println("[SPACE TASK] Auto-stopping after 10 runs.");
-                        this.cancel();
-                        // Note: The 'space_toggle' state in the JFrame won't update here
-                        // unless you add logic to call the key handler to simulate a stop,
-                        // or update the JFrame's state fields directly (more complex).
+                            // The pause should be inside the try block to catch the InterruptedException
+                            // when the main thread calls thread.interrupt()
+                            Thread.sleep(500); // Wait 500 milliseconds (0.5s)
+                        }
+                    } catch (InterruptedException e) {
+                        // This is the clean way to stop the thread when 'thread.interrupt()' is called.
+                        // Re-interrupt the thread for higher-level interrupt handlers (optional for this demo)
+                        Thread.currentThread().interrupt();
+                        // Fall through to finally or just exit the method.
+                        console.println("[SPACE TASK] Interrupted/Stopped gracefully.");
                     }
                 }
             });
 
-            console.println("Press SPACE to start/stop the non-blocking TimerTask (runs every 500ms).");
+            console.println("Press SPACE to start/stop the non-blocking Thread (runs every 500ms).");
             console.println("-------------------------------------");
 
             // --- Demonstration of background process output (existing simulation log) ---
