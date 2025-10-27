@@ -6,7 +6,6 @@ import audio_core.sequencer;
 import javax.sound.sampled.LineUnavailableException;
 import javax.swing.*;
 
-import ui.TextWindowConsole;
 import ui.text_ui;
 
 
@@ -74,7 +73,7 @@ void main() throws LineUnavailableException {
     SwingUtilities.invokeLater(() -> {
 
         int set = 0;
-        int row = 0;
+        AtomicInteger row = new AtomicInteger();
 
 
         ui.console.println("--- Welcome to the Custom Console ---");
@@ -93,12 +92,30 @@ void main() throws LineUnavailableException {
             while (ui.console.isRunning()) {
                 try {
                     Thread.sleep(10); // Wait 2 seconds
+                    ui.console.println(ui.console.key_pressed);
+
+                    if (ui.console.key_pressed != null){
+                        if (ui.console.key_pressed == "Up Arrow") {
+                            row.addAndGet(1);
+
+                        }
+                        if (ui.console.key_pressed == "Down Arrow") {
+                            row.addAndGet(-1);
+
+                        }
+
+
+                        ui.console.key_pressed = null;
+
+                    }
+
                     running[0] = ui.console.space_toggle;
                     //ui.console.println(String.format("[LOG] Simulation step %d complete.", ++count));
                     ui.console.clear();
                     ui.row_playing = progress[0];
-                    ui.render_notes(set,row);
+                    ui.render_notes(set, row.get());
                     ui.console.println(progress[0]);
+
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;

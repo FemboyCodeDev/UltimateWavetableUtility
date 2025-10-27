@@ -25,6 +25,8 @@ public class TextWindowConsole extends JFrame {
     private Supplier<Runnable> space_task_factory;
     public boolean space_toggle = false; // State: false=stopped, true=running
 
+    public String key_pressed;
+
     public TextWindowConsole(String title) {
         super(title);
 
@@ -114,6 +116,7 @@ public class TextWindowConsole extends JFrame {
                 }
 
                 // Print the key press event to the console window
+                key_pressed = keyName;
                 println("[INPUT]: Key Pressed: " + keyName);
             }
         });
