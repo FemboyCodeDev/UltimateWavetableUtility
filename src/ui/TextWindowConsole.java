@@ -148,24 +148,32 @@ public class TextWindowConsole extends JFrame {
      * Releases the update lock. This **appends the entire buffered text** to the
      * display area in one go, followed by a final auto-scroll to the bottom.
      */
+    /**
+     * Releases the update lock. This appends the entire buffered text to the
+     * display area in one go, followed by a final auto-scroll to the bottom.
+     */
     public void unlockUpdates() {
         if (!this.update_lock) return;
 
+        // Must be volatile before the GUI update block
+        this.update_lock = false;
+
         // Perform the GUI update on the EDT
         SwingUtilities.invokeLater(() -> {
-            // Append the entire buffered content once
+            // 1. Append the entire buffered content once
             if (text_buffer.length() > 0) {
                 outputArea.append(text_buffer.toString());
-                text_buffer.setLength(0); // Clear the buffer after appending
+                // Clear the buffer after appending (clearing buffer is technically safe outside
+                // the EDT since unlock is called on a single worker thread, but we use sync for safety)
+                synchronized (text_buffer) {
+                    text_buffer.setLength(0);
+                }
             }
 
-            // Force a scroll to the bottom
+            // 2. Force a scroll to the bottom
             outputArea.setCaretPosition(outputArea.getDocument().getLength());
-
-            this.update_lock = false; // Finally, release the lock
         });
     }
-
     // ---------------------------------------------
 
 
@@ -221,18 +229,32 @@ public class TextWindowConsole extends JFrame {
     }
 
     // Inside TextWindowConsole.java
+// Inside TextWindowConsole.java
     public void clear() {
-        if (update_lock) {
-            // 🆕 If locked, just clear the pending buffer, no GUI update is needed.
+        if (SwingUtilities.isEventDispatchThread()) {
+            // If we are already on the EDT, execute immediately
+            outputArea.setText("");
             synchronized (text_buffer) {
                 text_buffer.setLength(0);
             }
-            // If the buffer is cleared, any subsequent prints will start from a clean slate.
-        } else {
-            // If unlocked, execute the clear on the EDT immediately (with potential for flicker)
-            SwingUtilities.invokeLater(() -> {
+            return;
+        }
+
+        // ⬇️ This is the key change to ensure blocking behavior ⬇️
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                // 1. Clear the displayed GUI text synchronously
                 outputArea.setText("");
+
+                // 2. Clear the internal buffer (essential if new text is buffered immediately after)
+                synchronized (text_buffer) {
+                    text_buffer.setLength(0);
+                }
             });
+        } catch (Exception e) {
+            // Handle InterruptedException or InvocationTargetException
+            System.err.println("Error while synchronously clearing console: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
     }
 
