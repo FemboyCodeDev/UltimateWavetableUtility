@@ -12,17 +12,22 @@ public class text_ui {
         return String.format("%04d", number);
     }
 
-    public static int[][][] notes = new int[4][16][4];
+    public static int row_playing = 0;
+
+    public static int[][][] notes = new int[4][32][4];
 
 
     public static void render_notes(int set,int row){
         int[][] sequence = notes[set];
-            for (int i=row; (i<16)&&(i-row < 4);i++){
+            for (int i=row; (i<16)&&(i-row < 16);i++){
                 console.print(padIntToString(i));
                 console.print(" | ");
                 for (int note: sequence[i]) {
                     console.print(padIntToString(note));
                     console.print(" ");
+                }
+                if (row_playing == i){
+                    console.print(" <-");
                 }
                 console.println();
 

@@ -34,13 +34,15 @@ void main() throws LineUnavailableException {
     seq.sequence[3][1] = 69;
     seq.sequence_active[3][1] = true;
     seq.sequence_active[3][2] = true;
-    seq.sequence[3][2] = 69+12;
+    seq.sequence[3][2] = 69+4;
 
     ui.notes[0]= seq.sequence;
 
 
+    final int[] progress = {0};
 
     ui.console.setSpaceTaskFactory(() -> new Runnable(){
+
         boolean playing = true;
         public void play(){
         byte[] data = play_back.generate(SAMPLE_RATE);
@@ -56,11 +58,13 @@ void main() throws LineUnavailableException {
             for (int i =0; i<16;i++){
                 System.out.println(!Thread.currentThread().isInterrupted());
                 playing = !Thread.currentThread().isInterrupted();
+
                 if (playing==false){
                     return;
                 }
                 play();
                 seq.call_note_sequence(i);
+                progress[0] = i;
             }
 
         }
@@ -89,7 +93,10 @@ void main() throws LineUnavailableException {
                 try {
                     Thread.sleep(10); // Wait 2 seconds
                     //ui.console.println(String.format("[LOG] Simulation step %d complete.", ++count));
+                    ui.console.clear();
+                    ui.row_playing = progress[0];
                     ui.render_notes(set,row);
+                    ui.console.println(progress[0]);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;

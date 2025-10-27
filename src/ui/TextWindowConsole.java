@@ -164,8 +164,19 @@ public class TextWindowConsole extends JFrame {
         });
     }
 
+    public void println(int text) {
+        this.println(String.valueOf(text));
+
+    }
+
     public void println() {
         println("");
+    }
+    public void clear() {
+        // Swing GUI updates must happen on the EDT. SwingUtilities.invokeLater ensures this.
+        SwingUtilities.invokeLater(() -> {
+            outputArea.setText("");
+        });
     }
 
     public boolean isRunning() {
