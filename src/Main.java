@@ -36,7 +36,10 @@ void main() throws LineUnavailableException {
 
     ui.notes[0]= seq.sequence;
 
+
+
     ui.console.setSpaceTaskFactory(() -> new TimerTask(){
+        boolean playing = true;
         public void play(){
         byte[] data = play_back.generate(SAMPLE_RATE);
 
@@ -48,6 +51,10 @@ void main() throws LineUnavailableException {
 
         public void run(){
             for (int i =0; i<16;i++){
+                System.out.println(i);
+                if (playing==false){
+                    return;
+                }
                 play();
                 seq.call_note_sequence(i);
             }

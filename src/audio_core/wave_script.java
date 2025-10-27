@@ -49,7 +49,7 @@ public abstract class wave_script {
             }}
 
         }
-        System.out.println(total_value);
+        //System.out.println(total_value);
         return (byte)Math.clamp(total_value,-127,127);
         //return (byte) Math.max(-127,Math.min(127,total_value));
     }
