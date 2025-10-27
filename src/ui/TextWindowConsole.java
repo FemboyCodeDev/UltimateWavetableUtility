@@ -23,7 +23,7 @@ public class TextWindowConsole extends JFrame {
     private Thread current_space_thread;
     // Supplier for the core logic (the Runnable)
     private Supplier<Runnable> space_task_factory;
-    private boolean space_toggle = false; // State: false=stopped, true=running
+    public boolean space_toggle = false; // State: false=stopped, true=running
 
     public TextWindowConsole(String title) {
         super(title);

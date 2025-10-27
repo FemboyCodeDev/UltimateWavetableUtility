@@ -40,6 +40,7 @@ void main() throws LineUnavailableException {
 
 
     final int[] progress = {0};
+    final boolean[] running = {false};
 
     ui.console.setSpaceTaskFactory(() -> new Runnable(){
 
@@ -54,11 +55,11 @@ void main() throws LineUnavailableException {
         }
 
         public void run(){
-
+            running[0] = true;
             for (int i =0; i<16;i++){
                 System.out.println(!Thread.currentThread().isInterrupted());
                 playing = !Thread.currentThread().isInterrupted();
-
+                playing = running[0];
                 if (playing==false){
                     return;
                 }
@@ -92,6 +93,7 @@ void main() throws LineUnavailableException {
             while (ui.console.isRunning()) {
                 try {
                     Thread.sleep(10); // Wait 2 seconds
+                    running[0] = ui.console.space_toggle;
                     //ui.console.println(String.format("[LOG] Simulation step %d complete.", ++count));
                     ui.console.clear();
                     ui.row_playing = progress[0];
