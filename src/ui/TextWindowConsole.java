@@ -19,10 +19,13 @@ public class TextWindowConsole extends JFrame {
     // A flag to simulate non-blocking input handling (like a game loop)
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    // New flag to control window update suppression (primarily auto-scrolling and direct append)
+    // Flag to control window update suppression (now prevents both scrolling and appending)
     private volatile boolean update_lock = false;
 
-    // 🆕 New members for non-blocking task handling using a dedicated Thread
+    // 🆕 Buffer to hold text while update_lock is true
+    private final StringBuilder text_buffer = new StringBuilder();
+
+    // New members for non-blocking task handling using a dedicated Thread
     private Thread current_space_thread;
     // Supplier for the core logic (the Runnable)
     private Supplier<Runnable> space_task_factory;
@@ -53,8 +56,6 @@ public class TextWindowConsole extends JFrame {
         this.setSize(800, 600);
         this.setLocationRelativeTo(null); // Center the window
 
-        // 🆕 Removed java.util.Timer initialization
-
         // --- 3. Add Key Input Handling ---
 
         outputArea.addKeyListener(new KeyAdapter() {
@@ -79,7 +80,7 @@ public class TextWindowConsole extends JFrame {
                     case KeyEvent.VK_SPACE:
                         keyName = "Space";
 
-                        // 🆕 Non-blocking space task logic using Thread
+                        // Non-blocking space task logic using Thread
                         if (space_task_factory == null) {
                             println("[ERROR]: Space task factory not set. Cannot run task.");
                             return;
@@ -90,18 +91,13 @@ public class TextWindowConsole extends JFrame {
 
                         if (!space_toggle) { // Task was running, now stop
                             if (current_space_thread != null) {
-                                // 1. Crucial: Interrupt the running thread.
-                                // The task's run() method must check for this interrupt.
                                 current_space_thread.interrupt();
-                                current_space_thread = null; // Clean up the reference
+                                current_space_thread = null;
                             }
                             println("[INPUT]: Space pressed. Task STOPPED.");
                         } else { // Task was stopped, now start
-                            // 1. Create a brand new Thread instance with the supplied Runnable
                             current_space_thread = new Thread(space_task_factory.get(), "SpaceTaskThread");
-                            current_space_thread.setDaemon(true); // Allow JVM to exit if this is the only thread left
-
-                            // 2. Start the new task instance non-blockingly
+                            current_space_thread.setDaemon(true);
                             current_space_thread.start();
 
                             println("[INPUT]: Space pressed. Task STARTED (runs until interrupted).");
@@ -125,7 +121,6 @@ public class TextWindowConsole extends JFrame {
         });
 
         // Ensure the JTextArea immediately gets focus to capture keys
-        // Must be done *after* the frame is made visible
         this.setVisible(true);
         outputArea.requestFocusInWindow();
     }
@@ -139,25 +134,35 @@ public class TextWindowConsole extends JFrame {
         this.space_task_factory = factory;
     }
 
-    // --- 🆕 New Methods for Update Suppression ---
+    // --- New Methods for Update Suppression ---
 
     /**
-     * Sets the update lock. While locked, new output text is appended but auto-scrolling is suppressed.
-     * Use this before a batch of prints for performance.
+     * Sets the update lock. While locked, new output text is saved to a buffer
+     * and is NOT appended to the display area, suppressing all visual updates.
      */
     public void lockUpdates() {
         this.update_lock = true;
     }
 
     /**
-     * Releases the update lock. This triggers a final auto-scroll to the bottom.
-     * Call this after a batch of prints is complete.
+     * Releases the update lock. This **appends the entire buffered text** to the
+     * display area in one go, followed by a final auto-scroll to the bottom.
      */
     public void unlockUpdates() {
-        this.update_lock = false;
-        // Force a scroll to the bottom immediately after unlocking
+        if (!this.update_lock) return;
+
+        // Perform the GUI update on the EDT
         SwingUtilities.invokeLater(() -> {
+            // Append the entire buffered content once
+            if (text_buffer.length() > 0) {
+                outputArea.append(text_buffer.toString());
+                text_buffer.setLength(0); // Clear the buffer after appending
+            }
+
+            // Force a scroll to the bottom
             outputArea.setCaretPosition(outputArea.getDocument().getLength());
+
+            this.update_lock = false; // Finally, release the lock
         });
     }
 
@@ -165,38 +170,45 @@ public class TextWindowConsole extends JFrame {
 
 
     /**
+     * Core method to handle text output, either buffering or appending directly.
+     * @param text The string to be written.
+     * @param withNewline True if a newline should be appended.
+     */
+    private void write(String text, boolean withNewline) {
+        String fullText = withNewline ? text + "\n" : text;
+
+        if (update_lock) {
+            // If locked, append to the in-memory buffer, preventing any GUI update.
+            synchronized (text_buffer) {
+                text_buffer.append(fullText);
+            }
+        } else {
+            // If unlocked, immediately update the GUI on the EDT.
+            SwingUtilities.invokeLater(() -> {
+                outputArea.append(fullText);
+
+                // Auto-scroll is only performed when not locked (which is always true here)
+                outputArea.setCaretPosition(outputArea.getDocument().getLength());
+            });
+        }
+    }
+
+    /**
      * Appends text to the console window without a trailing newline.
-     * This method is thread-safe, ensuring GUI updates happen on the Event Dispatch Thread (EDT).
+     * This method is thread-safe.
      * @param text The string to be written.
      */
     public void print(String text) {
-        // Swing GUI updates must happen on the EDT. SwingUtilities.invokeLater ensures this.
-        SwingUtilities.invokeLater(() -> {
-            outputArea.append(text);
-
-            // Auto-scroll to the bottom of the output area ONLY if not locked
-            if (!update_lock) {
-                outputArea.setCaretPosition(outputArea.getDocument().getLength());
-            }
-        });
+        write(text, false);
     }
 
     /**
      * Appends a line of text to the console window, similar to System.out.println().
-     * The text will be followed by a trailing newline character (\n).
-     * This method is thread-safe, ensuring GUI updates happen on the Event Dispatch Thread (EDT).
+     * This method is thread-safe.
      * @param text The string to be written.
      */
     public void println(String text) {
-        // Swing GUI updates must happen on the EDT. SwingUtilities.invokeLater ensures this.
-        SwingUtilities.invokeLater(() -> {
-            outputArea.append(text + "\n");
-
-            // Auto-scroll to the bottom of the output area ONLY if not locked
-            if (!update_lock) {
-                outputArea.setCaretPosition(outputArea.getDocument().getLength());
-            }
-        });
+        write(text, true);
     }
 
     public void println(int text) {
@@ -207,6 +219,7 @@ public class TextWindowConsole extends JFrame {
     public void println() {
         println("");
     }
+
     public void clear() {
         // Swing GUI updates must happen on the EDT. SwingUtilities.invokeLater ensures this.
         SwingUtilities.invokeLater(() -> {
@@ -222,73 +235,56 @@ public class TextWindowConsole extends JFrame {
      * Main method for demonstrating the TextWindowConsole.
      */
     public static void main(String[] args) {
-        // Use the Event Dispatch Thread to initialize the GUI
         SwingUtilities.invokeLater(() -> {
-            TextWindowConsole console = new TextWindowConsole("Custom Java Console - Arrow Key Input");
+            TextWindowConsole console = new TextWindowConsole("Custom Java Console - Complete Update Suppression");
 
             console.println("--- Welcome to the Custom Console ---");
-            console.println("Press the Up, Down, Left, or Right arrow keys to test input capture.");
-            console.println("Press ESC to stop the background simulation.");
+            console.println("Press SPACE to start/stop the non-blocking Thread (runs every 500ms).");
             console.println("-------------------------------------");
 
-            // 🆕 Set the factory for the space task, now providing a Runnable
+            // Set the factory for the space task
             console.setSpaceTaskFactory(() -> new Runnable() {
                 private int counter = 0;
                 @Override
                 public void run() {
-                    // This code runs on the dedicated "SpaceTaskThread".
                     try {
-                        // The loop should continue *until* the thread is interrupted
                         while (!Thread.currentThread().isInterrupted()) {
-                            // Non-blocking task logic
                             console.println("[SPACE TASK] Running non-blockingly! Count: " + ++counter);
-
-                            // The pause should be inside the try block to catch the InterruptedException
-                            // when the main thread calls thread.interrupt()
-                            Thread.sleep(500); // Wait 500 milliseconds (0.5s)
+                            Thread.sleep(500);
                         }
                     } catch (InterruptedException e) {
-                        // This is the clean way to stop the thread when 'thread.interrupt()' is called.
-                        // Re-interrupt the thread for higher-level interrupt handlers (optional for this demo)
                         Thread.currentThread().interrupt();
-                        // Fall through to finally or just exit the method.
                         console.println("[SPACE TASK] Interrupted/Stopped gracefully.");
                     }
                 }
             });
 
-            console.println("Press SPACE to start/stop the non-blocking Thread (runs every 500ms).");
-            console.println("-------------------------------------");
-
-            // --- Demonstration of background process output (existing simulation log) ---
-            new Thread(() -> {
-                int count = 0;
-                while (console.isRunning()) {
-                    try {
-                        Thread.sleep(2000); // Wait 2 seconds
-                        console.println(String.format("[LOG] Simulation step %d complete.", ++count));
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-                console.println("Simulation stopped.");
-            }).start();
-
-            // --- 🆕 Demonstration of update suppression ---
+            // --- Demonstration of complete update suppression (new behavior) ---
             new Thread(() -> {
                 try {
-                    Thread.sleep(5000); // Wait 5 seconds
-                    console.println("\n[DEMO] Starting a batch of 50 prints with update suppression...");
-                    console.lockUpdates(); // 🔒 Lock updates
+                    Thread.sleep(3000); // Wait 3 seconds
 
+                    // Prints before the lock will appear instantly
+                    console.println("\n[DEMO] Starting a batch of 50 prints. No output will appear until unlocked...");
+
+                    console.lockUpdates(); // 🔒 Lock updates: text is buffered
+
+                    // This loop runs for 50 * 10ms = 500ms, but the GUI remains unchanged.
                     for (int i = 1; i <= 50; i++) {
-                        console.println(String.format("[BATCH] Locked Print %d.", i));
-                        Thread.sleep(10); // Short delay to simulate work, but scrolling is suppressed
+                        // The text is saved to text_buffer, NOT appended to outputArea.
+                        console.println(String.format("[BATCH] Buffered Print %d.", i));
+                        Thread.sleep(10);
                     }
 
+                    // This print is also saved to the buffer.
                     console.println("[DEMO] Batch complete. Unlocking updates now.");
-                    console.unlockUpdates(); // 🔓 Unlock updates, forces scroll
+
+                    Thread.sleep(2000); // Wait 2 seconds before unlocking (nothing is shown yet)
+
+                    console.unlockUpdates(); // 🔓 Unlock updates: ALL 52 lines appear instantly and scroll.
+
+                    console.println("[DEMO] Display is now updated and unlocked.");
+
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
