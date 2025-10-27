@@ -148,10 +148,6 @@ public class TextWindowConsole extends JFrame {
      * Releases the update lock. This **appends the entire buffered text** to the
      * display area in one go, followed by a final auto-scroll to the bottom.
      */
-    /**
-     * Releases the update lock. This appends the entire buffered text to the
-     * display area in one go, followed by a final auto-scroll to the bottom.
-     */
     public void unlockUpdates() {
         if (!this.update_lock) return;
 
